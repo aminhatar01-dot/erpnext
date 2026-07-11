@@ -55,9 +55,52 @@ tome una decisión informada (ver más abajo) o hasta que Frappe/ERPNext publiqu
    `docs/PRODUCTION_CHECKLIST.md` exigirá una re-confirmación explícita de esta decisión de versión
    antes de permitir marcar el proyecto como "listo para producción".
 
-## Acción pendiente que requiere decisión del usuario
+## Actualización 2026-07-11 — decisión definitiva del usuario
 
-- **¿Autorizás re-basar `modificaciones1` sobre el tag estable `v16.26.2`?** Esto implicaría un
-  force-push sobre `origin/modificaciones1` (dado que hoy no hay commits propios que perder, el riesgo
-  de pérdida de trabajo es nulo, pero la acción en sí requiere confirmación explícita por política).
-  Hasta recibir esa confirmación, se continúa sobre `develop` documentando el riesgo como se indica arriba.
+El usuario **no autorizó** el force-push/rebase de `modificaciones1`. En su lugar decidió: mantener
+`develop`, `modificaciones1` y el PR #1 exactamente como están (sin fusionar), y abrir una **rama nueva,
+paralela**, basada directamente en el tag estable oficial, para todo el desarrollo real de Office AI.
+
+### Verificación oficial de la versión estable (fuentes primarias, no supuestos)
+
+Consultado el 2026-07-11 vía GitHub API (`gh api repos/frappe/erpnext/releases/latest`):
+
+- **Último release no-draft, no-prerelease de ERPNext**: `v16.26.2`, publicado 2026-07-03.
+  `target_commitish`: `version-16`. SHA exacto del commit: `d1d3b241ae7bc21d18cf830a4bacd568e21a2a19`.
+- Confirmado con `git show v16.26.2:pyproject.toml` en el propio repo: `requires-python = ">=3.14"`.
+- **Frappe Framework compatible**: rama `version-16` (protegida, con checks obligatorios: Python Unit
+  Tests, Patch Test, linters). SHA de HEAD al momento de la verificación:
+  `4113465d23888d70936bb332fd9110ab4330cbf1`. `pyproject.toml` de esa rama:
+  `requires-python = ">=3.14,<3.15"`.
+- **Python**: 3.14.x (rango `>=3.14,<3.15` fijado por Frappe; ERPNext exige `>=3.14`). Confirmado también
+  por la imagen de CI oficial `ghcr.io/frappe/erpnext-ci-mariadb:py3.14-node24` usada en
+  `.github/workflows/server-tests-mariadb.yml` de la propia etiqueta `v16.26.2`.
+- **Node**: 24 (misma imagen de CI oficial `py3.14-node24`).
+- **MariaDB**: `mariadb:11.8`, según `overrides/compose.mariadb.yaml` del repositorio oficial
+  `frappe/frappe_docker` (rama `main`, consultado vía GitHub API).
+- **Redis**: `redis:8.6-alpine` (dos instancias: `redis-cache`, `redis-queue`), según
+  `overrides/compose.redis.yaml` del mismo repositorio oficial.
+
+### Rama creada
+
+- **`aminhatar01-dot/erpnext:office-ai-v16`**, creada con `git checkout -b office-ai-v16 v16.26.2` desde
+  el tag estable — **no desde `develop`**, sin mezclar historia de `develop`.
+- HEAD de `office-ai-v16` = `d1d3b241ae7bc21d18cf830a4bacd568e21a2a19` (idéntico al tag `v16.26.2`,
+  verificado con `git rev-parse HEAD`).
+- Publicada con `git push -u origin office-ai-v16` (push normal, sin `--force`, rama nueva).
+- Remoto `upstream` configurado: `https://github.com/frappe/erpnext.git` (ya existía desde la auditoría
+  inicial, re-confirmado).
+
+### Estado de las ramas después de esta decisión
+
+| Rama | Estado | Uso |
+|---|---|---|
+| `develop` | Sin modificar | Espejo de upstream, no se toca |
+| `modificaciones1` | Conservada, con la auditoría ya hecha | No recibe más commits de desarrollo de Office AI; el PR #1 permanece abierto y sin fusionar |
+| `office-ai-v16` | **Nueva, base real de trabajo** | Base estable (`v16.26.2`) para instalar ERPNext + Office AI en el entorno Docker integrado y para cualquier modificación de núcleo que llegara a justificarse (ver `docs/CORE_MODIFICATIONS.md`, hoy vacío) |
+
+### Consecuencia para `office-ai` (la app)
+
+La app Office AI (repositorio separado `aminhatar01-dot/office-ai`) pasa a desarrollarse en su propia
+rama `develop`, manteniendo `main` como rama estable solo para versiones validadas contra
+`office-ai-v16`. Ver `docs/IMPLEMENTATION_STATUS.md` para el detalle de avance.
